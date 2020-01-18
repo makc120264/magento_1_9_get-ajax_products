@@ -1,1 +1,1 @@
-# magento_1_9_get-ajaks_products
+# magento_1_9_get-ajax_products
