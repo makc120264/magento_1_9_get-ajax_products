@@ -1,0 +1,633 @@
+<?php
+/**
+ * Magento
+ *
+ * NOTICE OF LICENSE
+ *
+ * This source file is subject to the Academic Free License (AFL 3.0)
+ * that is bundled with this package in the file LICENSE_AFL.txt.
+ * It is also available through the world-wide-web at this URL:
+ * http://opensource.org/licenses/afl-3.0.php
+ * If you did not receive a copy of the license and are unable to
+ * obtain it through the world-wide-web, please send an email
+ * to license@magentocommerce.com so we can send you a copy immediately.
+ *
+ * DISCLAIMER
+ *
+ * Do not edit or add to this file if you wish to upgrade Magento to newer
+ * versions in the future. If you wish to customize Magento for your
+ * needs please refer to http://www.magentocommerce.com for more information.
+ *
+ * @category    design
+ * @package     base_default
+ * @copyright   Copyright (c) 2012 Magento Inc. (http://www.magentocommerce.com)
+ * @license     http://opensource.org/licenses/afl-3.0.php  Academic Free License (AFL 3.0)
+ */
+?>
+<?php
+/**
+ * Product list template
+ *
+ * @see Mage_Catalog_Block_Product_List
+ */
+?>
+<?php
+$_helper = $this->helper('catalog/output');
+$imgSize = 800;
+
+$_productCollection = $this->getLoadedProductCollection();
+$_count             = $_productCollection->count();
+
+$_comparedItems     = Mage::helper('local')->getCompareItems();
+$_comparedIds       = $_comparedItems->getAllIds();
+
+$_wishlistitemCollection = Mage::helper('wishlist')->getWishlistItemCollection();
+$_itemsInWishList = array();
+foreach ($_wishlistitemCollection as $_wishlistitem) {
+    $_wishlistproduct   = $_wishlistitem->getProduct();      
+    $_itemsInWishList[] = $_wishlistproduct->getId();
+}
+
+$toolbarHtml = $this->getToolbarHtml();
+
+$currentCategory    = Mage::getModel('catalog/layer')->getCurrentCategory();
+$currentCategoryId  = $currentCategory->getId();
+
+$store = Mage::app()->getStore(); // store info
+$storeCode = $store->getCode();
+$gridPerPage = Mage::getStoreConfig('catalog/frontend/grid_per_page', $store);
+
+?>
+<div class="category-products container">
+    <?php echo $toolbarHtml ?>
+    <div id="product-list-viewed_content" class="category-products container" style="display:none;">
+        <?php if (!Mage::app()->getRequest()->getParam('p', FALSE)): ?>
+        <?php echo $this->getChildHtml('product_viewed') ?>
+    <?php endif ?>
+</div>
+<div id="product-list"></div>
+<div id="product-list-base_content">
+    <?php if (!$_count): ?>
+        <p class="note-msg"><?php echo $this->__('There are no products matching the selection.') ?></p>
+        <?php else: ?>
+            <?php if ($this->getMode() != 'grid'): ?>    
+
+                <?php // List mode ?>
+
+                <?php // TODO - assign column key to $extra_attr while iterating so location will always be at the correct position ?>
+                
+                <?php // Add location for 'admin' customer group ?>
+                <ol class="products-list" id="products-list">
+
+                    <?php $i = 0 ?>
+                    <?php foreach ($_productCollection as $_product): ?> 
+
+                        <li class="<?php echo $i % 2 != 0 ? 'even' : 'odd' ?>">
+                            <?php $i++ ?>
+                            <div class="product-secondary">        
+                                <?php
+                                $imgCollection = $_product->getMediaGallery();
+                                $smallImage    = $_product->getSmallImage();
+                                $imgCount      = 0;
+                                $catImg        = $this->helper('catalog/image')->init($_product, 'small_image')->resize($imgSize)->setQuality(100);
+
+                                if (strpos($catImg, 'placeholder') !== FALSE) {
+                                    $resource        = Mage::getSingleton('core/resource');
+                                    $readConnection  = $resource->getConnection('core_read');
+                                    $writeConnection = $resource->getConnection('core_write');
+                                    $tableFeed       = $resource->getTableName('diamonds_feed');
+
+                                    $query = 'select * FROM `' . $tableFeed . '` WHERE sku = "' . $_product->getSku() . '" AND status = "skip" AND numimages > 0';
+                                    $readResult = $readConnection->query($query);
+                                    if ($readResult->rowCount() > 0) {
+                                        $query = 'UPDATE `' . $tableFeed . '` SET status = "force" WHERE sku = "' . $_product->getSku() . '"';
+                                        $writeConnection->query($query);
+                                    }
+                                }
+                                ?>
+                                <div class="product-image-list aaa">
+                                    <ul>
+                                        <li>
+                                            <a href="<?php echo $_product->getProductUrl() ?>" title="<?php echo $this->stripTags($this->getImageLabel($_product, 'small_image'), null, true) ?>" class="product-image">
+                                                <img src="<?php echo $catImg ?>" alt="<?php echo $this->stripTags($this->getImageLabel($_product, 'small_image'), null, true) ?>" />
+                                            </a>
+                                        </li>
+                                        <?php foreach ($imgCollection AS $img): ?>
+                                            <?php if ($smallImage != $img['file']): ?>
+                                                <?php ++$imgCount ?>
+                                                <li>
+                                                    <a href="<?php echo $_product->getProductUrl() ?>" title="<?php echo $this->stripTags($this->getImageLabel($_product, 'small_image'), null, true) ?>" class="product-image">
+                                                        <img src="<?php echo $this->helper('catalog/image')->init($_product, 'thumbnail', $img['file'])->resize($imgSize)->setQuality(100) ?>" alt="<?php echo $this->escapeHtml($img['label']) ?>" />
+                                                    </a>
+                                                </li>
+                                            <?php endif ?>
+                                        <?php endforeach ?>
+                                    </ul>
+                                </div>
+                                <?php if ($imgCount): ?>
+                                    <div class="product-image-nav">
+                                        <a href="javascript:;" class="product-image-nav-prev"><?php echo $this->__('Prev Image') ?></a>
+                                        <a href="javascript:;" class="product-image-nav-next"><?php echo $this->__('Next Image') ?></a>
+                                    </div>
+                                <?php endif ?>
+
+                                <a href="<?php echo $_product->getProductUrl() ?>" title="<?php echo $this->stripTags($_product->getName(), null, true) ?>"> <?php echo $_product->getSku() ?> </a>
+                            </div>
+                            <div class="product-secondary atttrVal"><?php echo $_product->getAttributeText('shape')?> </div>
+                            
+                            <!--  Remove prices section from recently sold category, get category id and set condition as per category set in admin @ah -->
+                            <?php
+                            $category = Mage::registry('current_category'); 
+                            ?>
+                            <?php if($category->getId() != 151):?>
+                                <?php $price = round($_product->getFinalPrice()) ?>
+
+                                <?php ## @AH remove 'Price' and 'Add to Cart' button code managed from system configuration in catalog based on store, manage from Zmage/Pricecart?>
+                                <?php 
+                                $storeId = Mage::app()->getStore()->getStoreId();
+                                $removePrice = Mage::getStoreConfig('catalog/price_cart_group/price_remove', $storeId);
+                                ?>
+                                <?php if ($price == 0 || $removePrice == 1): ?>
+                                    <div class="call_for_price"><?php echo $this->__('Price on Request') ?></div>
+                                    <?php else: ?>
+                                        <?php
+                                        echo $this->getPriceHtml($_product, true);
+                                    endif ?>
+                                <?php endif; ?>
+                                <!--  Remove prices section from recently sold category, get category id and set condition as per category set in admin @ah -->
+                                <?php $certificate = $_helper->getCertificateFilename($_product) ?>
+                                <?php if (!empty($certificate) ):  ?>
+                                    <?php if (stristr($certificate, 'pdf')): ?>
+                                        <div class="product-secondary atttrVal"><a class="fancyFrame lab_<?php echo $_product->getAttributeText('lab') ?>" href="http://docs.google.com/viewer?embedded=true&url=<?php echo Mage::getBaseUrl(Mage_Core_Model_Store::URL_TYPE_MEDIA) . 'import' . DS . 'certificates' . DS . $certificate  ?>"> <?php echo $_product->getAttributeText('lab') ?></a></div>
+                                        <?php elseif (stristr($certificate, 'jpg') || stristr($certificate, 'JPG') || stristr($certificate, 'Jpg')): ?>
+                                        <div class="product-secondary atttrVal"><a class="fancyImage lab_<?php echo $_product->getAttributeText('lab') ?>" href="<?php echo Mage::getBaseUrl(Mage_Core_Model_Store::URL_TYPE_MEDIA) . 'import' . DS . 'certificates' . DS . $certificate  ?>"><?php echo $_product->getAttributeText('lab') ?></a></div>
+                                        <?php elseif (stristr($certificate, 'http')): ?>
+                                            <div class="product-secondary atttrVal"><a class="fancyFrame lab_<?php echo $_product->getAttributeText('lab') ?>" href="<?php echo $certificate ?>"><?php echo $_product->getAttributeText('lab') ?></a></div> 
+                                            <?php else: ?>
+                                                <div class="product-secondary atttrVal"><?php echo $_product->getAttributeText('lab') ?></div>  
+                                            <?php endif ?>              
+                                        <?php endif ?>              
+                                    </li>
+                                <?php endforeach ?>
+                            </ol>
+                            <?php else: ?>
+
+                                <?php // Grid Mode ?>
+
+
+                                <div><?php echo $this->getLayout()->createBlock('cms/block')->setBlockId('banner_all')->toHtml() ?></div>
+                                <ul class="products-grid row js-row-height">
+                                    <?php foreach ($_productCollection AS $_product): ?>
+                                        <?php $_wishlistSubmitUrl = $this->helper('wishlist')->getAddUrl($_product) ?>         
+                                        <li class="col-xs-6 col-sm-3 col-md-3 col-lg-3 item quickviewpro-block" data-prod-id="<?php echo $_product->getId() ?>" data-prod-pos="<?php echo $_product->getCatIndexPosition() ?>">
+                                            <div class="product-wrapper">
+												<a class="product-url" href="<?php echo $_product->getProductUrl() ?>"></a>
+                                                <div class="product-img">   
+                                                    <?php $categorys = $_product->getCategoryIds() ?>
+                                                    <?php if (in_array(42, $categorys)){?>
+                                                        <img class = "ribbon" src="<?php echo $this->getSkinUrl('images/icons/new-item.png') ?>" alt="New Item" />
+                                                    <?php } ?>
+
+                                                    <?php
+                                                    $imgCollection = $_product->getMediaGallery();
+                                                    $smallImage    = $_product->getSmallImage();
+                                                    $imgCount      = 0;
+                                                    $catImg        = (string) $this->helper('catalog/image')->init($_product, 'small_image')->resize($imgSize)->setQuality(100);
+
+
+                                                    if (strpos($catImg, 'placeholder') !== FALSE) {
+                                                        $resource        = Mage::getSingleton('core/resource');
+                                                        $readConnection  = $resource->getConnection('core_read');
+                                                        $writeConnection = $resource->getConnection('core_write');
+                                                        $tableFeed       = $resource->getTableName('diamonds_feed');
+
+                                                        $query = 'select * FROM `' . $tableFeed . '` WHERE sku = "' . $_product->getSku() . '" AND status = "skip" AND numimages > 0';
+                                                        $readResult = $readConnection->query($query);
+                                                        if ($readResult->rowCount() > 0) {
+                                                            $query = 'UPDATE `' . $tableFeed . '` SET status = "force" WHERE sku = "' . $_product->getSku() . '"';
+                                                            $writeConnection->query($query);
+                                                        }
+                                                    }
+
+                                                    $cert1 = strtolower(trim($_product->getResource()->getAttribute('lab')->getFrontend()->getValue($_product)));
+                                                    $cert2 = strtolower(trim($_product->getResource()->getAttribute('report_2')->getFrontend()->getValue($_product)));
+                                                    ?>
+                                                    <div class="product-image-list bbb">
+                                                        <ul>
+                                                            <li>
+                                                                <a href="<?php echo $_product->getProductUrl() ?>" title="<?php echo $this->stripTags($this->getImageLabel($_product, 'small_image'), null, true) ?>" class="product-image">
+                                                                    <img src="<?php echo $catImg ?>" alt="<?php echo $this->stripTags($this->getImageLabel($_product, 'small_image'), null, true) ?>" />
+                                                                </a>
+                                                            </li>
+                                                        </ul>
+                                                    </div>
+                                                    <?php if ($imgCount): ?>
+                                                        <div class="product-image-nav">
+                                                            <a href="javascript:;" class="product-image-nav-prev"><?php echo $this->__('Prev Image') ?></a>
+                                                            <a href="javascript:;" class="product-image-nav-next"><?php echo $this->__('Next Image') ?></a>
+                                                        </div>
+                                                    <?php endif ?>
+
+                                                    <?php if ($cert1 == 'argyle' || $cert2 == 'argyle'): ?>
+                                                        <?php $imgUrl = Mage::getBaseUrl(Mage_Core_Model_Store::URL_TYPE_MEDIA) . 'wysiwyg/certificates/argyle.png' ?>
+                                                        <div class="product-list-certificat-icons">
+                                                            <img src="<?php echo $imgUrl ?>" alt="Argyle" />
+                                                        </div>
+                                                    <?php endif ?>
+
+                                                    <ul class="add-to-links">
+                                                        <?php if ($this->helper('wishlist')->isAllow()): ?>
+                                                        <li><a href="<?php echo $this->helper('wishlist')->getAddUrl($_product) ?>" data-remove="<?php echo Mage::getUrl('local/product/removeWishlistItem', array('product' => $_product->getId())) ?>" class="link-wishlist<?php echo (in_array($_product->getId(), $_itemsInWishList)) ? ' in-wishlist' : '' ?>"><span><?php echo $this->__('Add to Wishlist') ?></span></a></li>
+                                                    <?php endif ?>
+
+                                                </ul>
+
+                                            </div>
+                                            <div class="p_data clearfix">
+                                                <!--  Remove prices section from recently sold category, get category id and set condition as per category set in admin @ah -->
+                                                <?php $category = Mage::registry('current_category'); ?>
+                                                <?php $actionName = Mage::app()->getRequest()->getRouteName(); ?>
+
+                                                <?php if($actionName != 'catalogsearch'): ?>
+                                                    <?php $categoryId = $category->getId() ?>
+                                                    <?php else: ?>
+                                                        <?php $categoryId = '' ?>
+                                                    <?php endif; ?>
+                                                    <?php $storeId = Mage::app()->getStore()->getStoreId(); ?>
+
+                                                    <?php /*Getting the store config value from backend @kp*/?>
+                                                    <?php $configValue = Mage::getStoreConfig('catalog/frontend/dropdown', $storeId);?>
+                                                    <!-- Remove prices section from recently sold category, get category id and set condition as per category set in admin @ah -->
+                                                     <?php  $categoryArray = explode(",",$configValue); 
+                                                         $isInCategory = in_array($categoryId,$categoryArray);
+                                                     ?>
+                                                    <?php /*Display sold price which will not belongs to sold category @kp*/?>
+                                                    <?php $showcatListing = Mage::getStoreConfig('catalog/frontend/category_yesno', $storeId); ?>
+                                                    <?php if($showcatListing):?>
+                                                        <?php if(!$isInCategory):?>
+                                                            <div class="product_cc"> 
+                                                                <?php $price = round($_product->getFinalPrice()) ?>
+                                                                <?php $storeId = Mage::app()->getStore()->getStoreId(); ?>
+                                                                <?php $removePrice = Mage::getStoreConfig('catalog/price_cart_group/price_remove', $storeId); ?>
+                                                                <?php /* @AH remove 'Price' and 'Add to Cart' button code managed from system configuration in catalog based on store, manage from Zmage/Pricecart */ ?>
+                                                                <?php if ($price == 0 || $removePrice == 1): ?>
+                                                                    <div class="call_for_price"><?php echo $this->__('Price on Request') ?></div>
+                                                                    <?php else: ?>
+                                                                        <?php echo $this->getPriceHtml($_product, true); ?>
+                                                                    <?php endif ?>
+                                                            </div>                                     
+                                                            <?php endif; ?>
+                                                    <?php else:?>
+                                                            <div class="product_cc"> 
+                                                                <?php $price = round($_product->getFinalPrice()) ?>
+                                                                <?php $storeId = Mage::app()->getStore()->getStoreId(); ?>
+                                                                <?php $removePrice = Mage::getStoreConfig('catalog/price_cart_group/price_remove', $storeId); ?>
+                                                                <?php /* @AH remove 'Price' and 'Add to Cart' button code managed from system configuration in catalog based on store, manage from Zmage/Pricecart */ ?>
+                                                                <?php if ($price == 0 || $removePrice == 1): ?>
+                                                                    <div class="call_for_price"><?php echo $this->__('Price on Request') ?></div>
+                                                                    <?php else: ?>
+                                                                        <?php echo $this->getPriceHtml($_product, true); ?>
+                                                                <?php endif ?>
+                                                            </div> 
+                                                    <?php endif;?>
+
+                                                        <h2 class="product-name">
+
+                                                            <?php 
+                                                                /* All except loose diamond: 
+                                                                main part - will be until first comma (e.g. Fancy Yellow Diamonds Ring ) 
+                                                                detailed - all the rest (e.g Cushion Shape, VS1 Clarity, GIA Certified, 12345678)
+                                                                Loose Diamonds:
+                                                                main part - will be until second comma (e.g 4.24 Carat, Fancy Intence Yellow Diamond)
+                                                                detailed - all the rest (e.g Cusion Shape, VS2 Clarity, GIA ...)*/
+                                                                ?>
+                                                                <a href="<?php echo $_product->getProductUrl() ?>" title="<?php echo $this->stripTags($_product->getName(), null, true) ?>">
+                                                                    <?php
+                                                                    $AllCategoriesInCatalog = Mage::getModel('catalog/category')->getCollection();
+                                                //all colored diamonds categories
+                                                                    $AllCategoriesInCatalog->addFieldToFilter('path', array('like' => '1/2/4/%'));
+                                                                    $colorDiamondsCatIds  = $AllCategoriesInCatalog->getColumnValues('entity_id');
+
+                                                                    $productHasColoredDiamondsCat = FALSE;
+                                                                    $categorys = $_product->getCategoryIds();
+                                                                    foreach($categorys as $category){
+                                                                        if (in_array($category, $colorDiamondsCatIds)){
+                                                                            $productHasColoredDiamondsCat = TRUE;
+                                                                            break;
+                                                                        }
+                                                                    }
+
+                                                                    $name = $_helper->productAttribute($_product, $_product->getName(), 'name');
+                                                                    $name = explode(',', $name);
+
+                                                                    if ($productHasColoredDiamondsCat){
+                                                                        $first = trim($name[0].", ".$name[1]);
+                                                                        unset($name[0]);
+                                                                        unset($name[1]);
+                                                                        $second = implode(',', $name);
+                                                                    } else {
+                                                                        $first = trim($name[0]);
+                                                                        unset($name[0]);
+                                                                        $second = implode(',', $name);
+                                                                    }                                                       
+                                                                    echo $first;
+                                                                    ?>                                        
+                                                                    <span class="product-name-info">
+                                                                        <?php echo $second;?>
+                                                                    </span>
+                                                                    <span class="product-desc-long">
+                                                                        <?php /*getting product description @KP*/?>
+                                                                        <?php if($currentCategoryId=='153'):?>
+                                                                         <?php if ($_product->getDescription()): ?>
+
+                                                                            <?php echo mb_strimwidth($_product->getDescription(),0,25,"...",'utf-8'); ?>
+
+                                                                        <?php endif ?>
+                                                                    <?php endif ?>
+                                                                </span>
+                                                            </a>
+                                                        </h2>  
+
+                                                    </div>
+                                                    <div class="p_more clearfix">
+                                                        <button class="button" onclick="window.location.href='<?php echo $_product->getProductUrl() ?>'" type="submit"><span><span><?php echo $this->__("ASK ABOUT THIS DIAMONDS") ?></span></span></button>
+                                                    </div>
+                                                </div>
+                                            </li>
+                                    <?php endforeach ?>
+                                </ul>
+
+                                <div class="button-more" style="text-align: center; margin: 16px 0 16px 0;">
+                                    <button type="button" title="More" class="button" onclick="getProducts()" style="background: #fff !important;color: #000;border: 3px solid #000;width: 115px;">
+                                        <span><span>More</span></span>
+                                    </button>
+                                </div>
+
+                                <script type="text/javascript">decorateGeneric($$('ul.products-grid'), ['odd','even','first','last'])</script>
+                                <?php endif ?>
+
+                                <div class="toolbar-bottom">
+                                    <?php
+                                    $toolbarHtml = ' ' . $toolbarHtml;
+                                    while ($helpPos1 = strpos($toolbarHtml, '<!-- remove from bottom list flag START -->', 0)) {
+                                        $helpPos2    = strpos($toolbarHtml, '<!-- remove from bottom list flag END -->', $helpPos1);
+                                        $toolbarHtml = substr($toolbarHtml, 0, $helpPos2) . substr($toolbarHtml, $helpPos2 + 41);
+                                    }
+                                    //echo $toolbarHtml;
+                                    ?>
+                                </div>
+                            <?php endif ?>
+                        </div>
+                    </div>
+
+                    <script>
+                        new Varien.BTabs('.toolbar-tabs');
+
+                        var viewedAjax;
+                        var resizeProductListImageScroll;
+
+                        jQuery(document).ready(function($) {
+
+        // -----------------------
+        // --- LIST IMG SCROLL ---
+        // -----------------------
+        resizeProductListImageScroll = {
+            init: function(imgClass)
+            {
+                if (typeof imgClass == 'undefined') {
+                    imgClass = '#product-list-base_content';
+                }
+
+                resizeProductListImageScroll.setSizes();
+                $(imgClass).find('.product-image-nav-prev').on('click', function() {
+                    var container = $(this).parents('.product-img').find('.product-image-list');
+                    var images    = container.find('ul');
+
+                    var count     = parseInt(container.find('li').length);
+                    var widthItem = parseInt(container.css('width'));
+                    var left      = parseInt(images.css('left'));
+
+                    left += widthItem;
+                    if (left > 0) {
+                        left = -1 * widthItem * (count - 1);
+                    }
+
+                    resizeProductListImageScroll.animageToLeft(images, left);
+                });
+
+                $(imgClass).find('.product-image-nav-next').on('click', function() {
+                    var container = $(this).parents('.product-img').find('.product-image-list');
+                    var images    = container.find('ul');
+
+                    var count     = parseInt(container.find('li').length);
+                    var widthItem = parseInt(container.css('width'));
+                    var left      = parseInt(images.css('left'));
+
+                    left -= widthItem;
+                    if (left < -1 * widthItem * (count - 1)) {
+                        left = 0;
+                    }
+
+                    resizeProductListImageScroll.animageToLeft(images, left);
+                });
+            },
+            animageToLeft: function(block, left)
+            {
+                block.animate({
+                    left: left,
+                }, 500, function() {
+                    // Animation complete.
+                });
+            },
+            setSizes: function(img)
+            {
+                var tab      = $('.toolbar-tabs .active');
+                var activeId = tab.attr('id');
+                var block    = $('#' + activeId + '_content li.item').last();
+
+
+                var width  = parseInt(block.width());
+                var height = width;
+                $('.product-image-list').css({
+                    width  : width  + 'px',
+                    height : height + 'px'
+                });
+
+                $('.product-image-list .product-image img').css({
+                    width  : width  + 'px',
+                    height : height + 'px'
+                });
+
+                var top = height / 2;
+                $('.product-image-nav a').css({
+                    top: top + 'px'
+                });
+
+                $('.product-image-list').each(function(index, imageList) {
+                    var items = $(imageList).find('li');
+                    var count = items.length;
+                    $(imageList).find('ul').css({
+                        width  : (count * width) + 'px',
+                        height : height + 'px'
+                    });
+                });
+            },
+            reload: function()
+            {
+                resizeProductListImageScroll.setSizes();
+            }
+        }
+
+        resizeProductListImageScroll.init();
+        $( window ).resize(function() {
+            resizeProductListImageScroll.reload();
+        });
+
+        // ---------------------
+        // ------ OTHERS -------
+        // ---------------------
+        //updatePrice();
+
+        var show_columns = function () {
+            $('.products-list td,.products-list th').show();
+        }
+
+        var hide_columns = function () {
+            <?php if (isset($extra_attr)): ?>
+                <?php foreach ($extra_attr as $position): ?>
+                    $('.products-list td:nth-child(<?php echo $position ?>),.products-list th:nth-child(<?php echo $position ?>)').hide();
+                <?php endforeach ?> 
+            <?php endif ?>
+        }
+
+        hide_columns();
+
+        isOpen = false;
+        $('.table_toggle').click(function() {
+            if (isOpen) {
+                hide_columns();
+                $('.table_toggle').html('<span class="icon">+</span> <?php echo $this->__("Show more") ?>');
+                isOpen = false;
+            } else {
+                show_columns();
+                $('.table_toggle').html('<span class="icon">-</span> <?php echo $this->__("Less") ?>');
+                isOpen = true;
+            }
+
+            return false;
+        });
+
+        $('.product_data').hide();
+        $('.products-grid .item').mouseover(function() {
+            $('.product_data').hide();
+            $(this).find('.product_data').show();
+        });
+
+        $('.product_data').mouseout(function() {
+          $(this).hide();
+      });
+
+        wishlistAjax.init();
+
+        // -----------------------
+        // ------- VIEWED --------
+        // -----------------------
+        viewedAjax = {
+            ajax: function()
+            {
+                loader.show();
+                var url = '<?php echo $this->getUrl('local/product/viewed') ?>';
+
+                $.ajax({
+                    url      : url,
+                    dataType : 'json',
+                    type     : 'post',
+                    data     : '',
+                    success  : function(data) {
+                        loader.hide();
+                        $('.recently-viewed .count').html(data.viewed);
+
+                        $('#product-list-viewed_content').html(data.html);
+
+                        resizeProductListImageScroll.init('#product-list-viewed_content');
+                    }
+                });
+            }
+        } 
+
+        // -----------------------
+        // ------- COMPARE -------
+        // -----------------------
+        var compareAjax = {
+            init: function()
+            {
+                $('.link-compare').each(function() {
+                    var link = $(this);
+
+                    compareAjax.clearEvents(link);
+                    link.on('click', function() {
+                        compareAjax.ajax(this);
+                    });
+                });
+            },
+            clearEvents: function(link)
+            {
+                var itemOnclick = link.attr('href');
+                if (itemOnclick) {
+                    link.attr('data-link', itemOnclick);
+                }
+
+                link.attr('href', 'javascript:;')
+
+                link.onclick = function(){
+                    return false;
+                };
+            },
+            ajax: function(link)
+            {
+                loader.show();
+                if ($(link).hasClass('compared')) {
+                    var url = $(link).attr('data-remove');
+                } else {
+                    var url = $(link).attr('data-link');
+                }
+
+                $(link).toggleClass('compared');
+
+                $.ajax({
+                    url      : url,
+                    dataType : 'json',
+                    type     : 'post',
+                    data     : 'isAjax=1',
+                    success  : function(data) {
+                        loader.hide();
+                        $('.comparison .count').html(data.compared);
+
+                    }
+                });
+            }
+        }
+
+        compareAjax.init();
+    });
+
+    function getProducts(){
+        // loader.show();
+        var url = '<?php echo $this->getUrl('getajaxproducts') ?>';
+        var page = jQuery('ul.products-grid').length + 1;
+
+        jQuery.ajax({
+            url      : url,
+            type     : 'post',
+            data     : 'page=' + page + '&gridPerPage=' + <?php echo $gridPerPage?>,
+            success  : function(data) {
+                // loader.hide();
+                console.log(data);
+            },
+            error: function(jqXHR, textStatus, errorThrown){
+                alert('error');
+            }
+        });
+
+    }
+</script>
