@@ -357,16 +357,11 @@ $gridPerPage = Mage::getStoreConfig('catalog/frontend/grid_per_page', $store);
                                     <?php endforeach ?>
                                 </ul>
 
-                                <div class="button-more" style="text-align: center; margin: 16px 0 16px 0;">
-                                    <button type="button" title="More" class="button" onclick="getProducts()" style="background: #fff !important;color: #000;border: 3px solid #000;width: 115px;">
-                                        <span><span>More</span></span>
-                                    </button>
-                                </div>
 
                                 <script type="text/javascript">decorateGeneric($$('ul.products-grid'), ['odd','even','first','last'])</script>
                                 <?php endif ?>
 
-                                <div class="toolbar-bottom">
+                                <div class="toolbar-bottom" style="border-top: unset;">
                                     <?php
                                     $toolbarHtml = ' ' . $toolbarHtml;
                                     while ($helpPos1 = strpos($toolbarHtml, '<!-- remove from bottom list flag START -->', 0)) {
@@ -378,7 +373,13 @@ $gridPerPage = Mage::getStoreConfig('catalog/frontend/grid_per_page', $store);
                                 </div>
                             <?php endif ?>
                         </div>
-                    </div>
+
+                        <div class="button-more" style="text-align: center; margin: 16px 0 16px 0;">
+                            <button type="button" title="More" class="button" onclick="getProducts()" style="background: #fff !important;color: #000;border: 3px solid #000;width: 115px;">
+                                <span>View more</span>
+                            </button>
+                        </div>
+</div>
 
                     <script>
                         new Varien.BTabs('.toolbar-tabs');
@@ -612,7 +613,7 @@ $gridPerPage = Mage::getStoreConfig('catalog/frontend/grid_per_page', $store);
     });
 
     function getProducts(){
-        // loader.show();
+        loader.show();
         var url = '<?php echo $this->getUrl('getajaxproducts') ?>';
         var page = jQuery('ul.products-grid').length + 1;
 
@@ -620,14 +621,13 @@ $gridPerPage = Mage::getStoreConfig('catalog/frontend/grid_per_page', $store);
             url      : url,
             type     : 'post',
             data     : 'page=' + page + '&gridPerPage=' + <?php echo $gridPerPage?>,
-            success  : function(data) {
-                // loader.hide();
-                console.log(data);
+            success  : function(content) {
+                loader.hide();
+                jQuery("#product-list-base_content ul.products-grid:last").after(content);
             },
             error: function(jqXHR, textStatus, errorThrown){
-                alert('error');
+                alert(textStatus);
             }
         });
-
     }
 </script>
